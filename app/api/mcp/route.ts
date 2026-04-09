@@ -85,6 +85,24 @@ const handler = createMcpHandler(
         return { content: [{ type: "text", text: `Step ${step}: ${target.content}` }] };
       }
     );
+
+    server.registerTool(
+      "register_role",
+      {
+        title: "Register Role",
+        description: "Registers a new role in the database after signup guide completion.",
+        inputSchema: {
+          role_name: z.string().describe("The name of the role to register"),
+          completion_key: z.string().describe("The completion key obtained from the final signup step"),
+        },
+      },
+      async ({ role_name, completion_key }) => {
+        if (completion_key !== "FINISH") return { content: [{ type: "text", text: "Error: Signup guide not completed or invalid key." }], isError: true };
+        const { data, error } = await supabase.from("roles").insert([{ name: role_name }]).select().single();
+        if (error) return { content: [{ type: "text", text: `Error: ${error.message}` }], isError: true };
+        return { content: [{ type: "text", text: `Success: Role '${role_name}' registered with ID ${data.id}.` }] };
+      }
+    );
   },
   {},
   { basePath: "/api/mcp", verboseLogs: true }
