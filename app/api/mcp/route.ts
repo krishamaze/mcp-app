@@ -62,6 +62,29 @@ const handler = createMcpHandler(
         }
       }
     );
+
+    server.registerTool(
+      "get_signup_guide_step",
+      {
+        title: "Get Signup Guide Step",
+        description: "Returns content for a specific signup step if the unlock key is correct.",
+        inputSchema: {
+          step: z.number().describe("The step number (1-3)"),
+          unlock_key: z.string().describe("The secret key to unlock the step content"),
+        },
+      },
+      async ({ step, unlock_key }) => {
+        const steps: Record<number, { key: string, content: string }> = {
+          1: { key: "START", content: "Welcome! Enter your email to begin." },
+          2: { key: "VERIFY", content: "Check your inbox for a verification code." },
+          3: { key: "FINISH", content: "Setup your profile and password." }
+        };
+        const target = steps[step];
+        if (!target) return { content: [{ type: "text", text: "Error: Invalid step number." }], isError: true };
+        if (target.key !== unlock_key) return { content: [{ type: "text", text: "Error: Incorrect unlock key." }], isError: true };
+        return { content: [{ type: "text", text: `Step ${step}: ${target.content}` }] };
+      }
+    );
   },
   {},
   { basePath: "/api/mcp", verboseLogs: true }
