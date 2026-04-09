@@ -12,72 +12,31 @@ const handler = createMcpHandler(
       "claim_session",
       {
         title: "Claim Session",
-        description: "Checks if role has active session, claims or creates one, returns session id and status.",
+        description: "Looks up role by name, checks for an active session in employee_sessions, claims or creates one, and returns the session details in a single line.",
         inputSchema: {
-          role: z.string().describe("The role to claim a session for (e.g. 'agent', 'user')"),
+          role_name: z.string().describe("The name of the role to claim a session for"),
         },
       },
-      async ({ role }) => {
-        // 1. Check for active session for this role
-        const { data: activeSession, error: fetchError } = await supabase
-          .from("sessions")
-          .select("id, status")
-          .eq("role", role)
-          .eq("status", "active")
-          .single();
+      async ({ role_name }) => {
+        const { data: role, error: roleError } = await supabase.from("roles").select("id").eq("name", role_name).single();
+        if (roleError) return { content: [{ type: "text", text: `Error: Role '${role_name}' not found.` }], isError: true };
 
-        if (fetchError && fetchError.code !== "PGRST116") { // PGRST116 is 'no rows returned'
-          return {
-            content: [{ type: "text", text: `Error fetching session: ${fetchError.message}` }],
-            isError: true,
-          };
+        const { data: active, error: fError } = await supabase.from("employee_sessions").select("id, status, thread_id").eq("role_id", role.id).eq("status", "active").single();
+        if (fError && fError.code !== "PGRST116") return { content: [{ type: "text", text: `Error: ${fError.message}` }], isError: true };
+
+        if (active) {
+          return { content: [{ type: "text", text: `SessionID: ${active.id}, Status: ${active.status}, ThreadID: ${active.thread_id || 'none'}, Role: ${role_name}, Message: Active session claimed.` }] };
         }
 
-        if (activeSession) {
-          return {
-            content: [{ 
-              type: "text", 
-              text: JSON.stringify({ 
-                sessionId: activeSession.id, 
-                status: activeSession.status,
-                message: "Active session found and claimed."
-              }, null, 2) 
-            }],
-          };
-        }
+        const { data: newS, error: cError } = await supabase.from("employee_sessions").insert([{ role_id: role.id, status: "active" }]).select().single();
+        if (cError) return { content: [{ type: "text", text: `Error: ${cError.message}` }], isError: true };
 
-        // 2. No active session, create a new one
-        const { data: newSession, error: createError } = await supabase
-          .from("sessions")
-          .insert([{ role, status: "active" }])
-          .select()
-          .single();
-
-        if (createError) {
-          return {
-            content: [{ type: "text", text: `Error creating session: ${createError.message}` }],
-            isError: true,
-          };
-        }
-
-        return {
-          content: [{ 
-            type: "text", 
-            text: JSON.stringify({ 
-              sessionId: newSession.id, 
-              status: newSession.status,
-              message: "New session created."
-            }, null, 2) 
-          }],
-        };
+        return { content: [{ type: "text", text: `SessionID: ${newS.id}, Status: ${newS.status}, ThreadID: ${newS.thread_id || 'none'}, Role: ${role_name}, Message: New session created.` }] };
       }
     );
   },
   {},
-  {
-    basePath: "/api/mcp",
-    verboseLogs: true,
-  }
+  { basePath: "/api/mcp", verboseLogs: true }
 );
 
 export { handler as GET, handler as POST };
