@@ -39,6 +39,29 @@ const handler = createMcpHandler(
         return { content: [{ type: "text", text: `SessionID: ${newS.id}, Status: active, ThreadID: ${newS.thread_id || 'none'}, Role: ${role_name}, Message: New session created.` }] };
       }
     );
+
+    server.registerTool(
+      "check_role_session",
+      {
+        title: "Check Role Session",
+        description: "Checks if a named role currently has an active session.",
+        inputSchema: {
+          role_name: z.string().describe("The name of the role to check"),
+        },
+      },
+      async ({ role_name }) => {
+        const { data: role, error: roleError } = await supabase.from("roles").select("id").eq("name", role_name).single();
+        if (roleError) return { content: [{ type: "text", text: `Error: Role '${role_name}' not found.` }], isError: true };
+
+        const { data: active } = await supabase.from("employee_sessions").select("id, status, thread_id").eq("role_id", role.id).eq("status", "active").maybeSingle();
+        
+        if (active) {
+          return { content: [{ type: "text", text: `Role: ${role_name}, Status: active, SessionID: ${active.id}, ThreadID: ${active.thread_id || 'none'}.` }] };
+        } else {
+          return { content: [{ type: "text", text: `Role: ${role_name}, Status: no active session.` }] };
+        }
+      }
+    );
   },
   {},
   { basePath: "/api/mcp", verboseLogs: true }
