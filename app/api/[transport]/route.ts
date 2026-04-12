@@ -105,7 +105,7 @@ const handler = createMcpHandler(
     );
   },
   {},
-  { basePath: "/api/mcp", verboseLogs: true }
+  { basePath: "/api", verboseLogs: true }
 );
 
 export { handler as GET, handler as POST };
